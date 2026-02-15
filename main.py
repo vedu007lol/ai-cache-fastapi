@@ -25,14 +25,14 @@ class QueryRequest(BaseModel):
 
 @app.post("/")
 def query_ai(req: QueryRequest):
-    request_start = time.time()
+    start = time.perf_counter()
 
     normalized = cache.normalize(req.query)
 
     # EXACT MATCH
     exact = cache.get_exact(normalized)
     if exact:
-        latency = max(1, int((time.time() - request_start) * 1000))
+        latency = max(1, int((time.perf_counter() - start) * 1000))
         analytics.record_hit(latency, AVG_TOKENS_PER_REQUEST)
         return {
             "answer": exact,
@@ -45,7 +45,7 @@ def query_ai(req: QueryRequest):
     query_embedding = embed(normalized)
     semantic = cache.get_semantic(query_embedding)
     if semantic:
-        latency = max(1, int((time.time() - request_start) * 1000))
+        latency = max(1, int((time.perf_counter() - start) * 1000))
         analytics.record_hit(latency, AVG_TOKENS_PER_REQUEST)
         return {
             "answer": semantic,
@@ -54,13 +54,13 @@ def query_ai(req: QueryRequest):
             "cacheKey": "semantic"
         }
 
-    # MISS → FORCE REAL HTTP DELAY
-    time.sleep(2.0)   # REAL physical delay
-
+    # MISS → Simulated realistic LLM latency
+    time.sleep(1.2)   # IMPORTANT: force slow miss
     answer = f"Content moderation result for: {req.query}"
+
     cache.set(normalized, answer)
 
-    latency = max(1, int((time.time() - request_start) * 1000))
+    latency = max(1, int((time.perf_counter() - start) * 1000))
     analytics.record_miss(latency)
 
     return {
